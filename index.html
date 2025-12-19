@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>物联网数据实时显示</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 20px auto; 
+            padding: 0 20px; 
+            box-sizing: border-box;
+        }
+        .data-container { 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            padding: 20px; 
+            min-height: 300px; 
+            margin-top: 20px; 
+            width: 100%; 
+            box-sizing: border-box;
+            overflow-y: auto; 
+        }
+        .data-item { 
+            margin: 8px 0; 
+            padding: 10px; 
+            background: #f5f5f5; 
+            border-radius: 4px; 
+            line-height: 1.5; 
+        }
+        h1 { 
+            color: #3366cc; 
+            text-align: center; 
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>物联网传感器实时数据</h1>
+    <div class="data-container" id="dataDisplay"></div>
+
+    <script>
+        // 建立WebSocket连接
+        const ws = new WebSocket(`ws://${window.location.host}`);
+        const dataDisplay = document.getElementById('dataDisplay');
+
+        // 接收服务端数据并显示（兼容Blob和字符串类型）
+        ws.onmessage = function(event) {
+            if (event.data instanceof Blob) {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    try {
+                        const data = JSON.parse(reader.result);
+                        renderData(data);
+                    } catch (e) {
+                        console.error('Blob数据解析失败：', e);
+                    }
+                };
+                reader.readAsText(event.data);
+            } else {
+                try {
+                    const data = JSON.parse(event.data);
+                    renderData(data);
+                } catch (e) {
+                    console.error('字符串数据解析失败：', e);
+                }
+            }
+        };
+
+        // 渲染数据（使用网页端本地时间，不再依赖发布者timestamp）
+        function renderData(data) {
+            // 直接生成网页端接收数据时的本地时间
+            const timeStr = new Date().toLocaleString();
+            const temp = data.temperature || '0.0';
+            const humi = data.humidity || '0.0';
+
+            const dataItem = document.createElement('div');
+            dataItem.className = 'data-item';
+            dataItem.innerHTML = `<strong>[${timeStr}]</strong> 传感器数据：温度 ${temp}℃ | 湿度 ${humi}%`;
+            dataDisplay.prepend(dataItem);
+        }
+
+        // 连接异常处理
+        ws.onerror = function(error) {
+            console.error('WebSocket连接错误：', error);
+        };
+
+        // 自动重连
+        ws.onclose = function() {
+            console.log('WebSocket连接已关闭，3秒后尝试重连...');
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        };
+    </script>
+</body>
+</html>
